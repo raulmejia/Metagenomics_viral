@@ -1,12 +1,19 @@
 ######################
 ###
-###  Extract of the reference library
+# Count table is a non headed, tab separated two column dataframe that contains:
+### Reads or contigs in the first column
+### Lane and sample in the second column
+#### Extract of the count table ####
+# Z48163.2 201001339_S1_L001
+# Z48163.2 201001339_S1_L001
+#
+###  referencetable is a headed two column file that contains 
+# In the first column the Sample&Lane
+# In the second column the number of non-human reads
+###  Extract of the reference library #####
 # ID;numberofreads_after_bowtie2
 # S1_L001;669188
 # S1_L002;653369
-#### Extract of the count table
-# Z48163.2 201001339_S1_L001
-# Z48163.2 201001339_S1_L001
 
 ######################
 ##
@@ -72,16 +79,16 @@ args <- parser$parse_args()
 ## The program starts
 #############################
 mycountdf_path <-args$counttabledf
-# mycountdf_path  <-"/media/rmejia/mountme88/Projects/Maja_PhD_virusproject/allfiles.csv"
+# mycountdf_path  <-"/media/rmejia/mountme88/Projects/Maja/Maja_PhD_virusproject/allfiles.csv"
 
 referencetable_path <-args$referencetable
-# referencetable_path <-"/media/rmejia/mountme88/Projects/Maja_PhD_virusproject/numberofreads_after_bowtie2.csv"
+# referencetable_path <-"/media/rmejia/mountme88/Projects/Maja/Maja_PhD_virusproject/numberofreads_after_bowtie2.csv"
 
 label <- args$label
-# label <- "Filtered_reads"
+# label <- "Contigs_from_filtered_reads"
 
 save_folder <- args$outputfolder
-#  save_folder <- "/media/rmejia/mountme88/Projects/Maja_PhD_virusproject/Results/Filtered_reads"
+#  save_folder <- "/media/rmejia/mountme88/Projects/Maja/Maja_PhD_virusproject/Results/Contigs_Normalized_by_Filtered_reads/"
 
 ####################
 ### The program starts
@@ -93,7 +100,7 @@ dir.create(save_folder, recursive = TRUE)
 save_folder <- normalizePath(save_folder)
 
 #allfilesmatrix <- as.matrix(allfiles)
-colnames(mycountdf)<- c("sseqid", "Libsize_patient_lane")
+colnames(mycountdf) <- c("sseqid", "Libsize_patient_lane")
 
 # Splitting by patient
 mycountdf$patient <- mycountdf$Libsize_patient_lane # Adding a column with the patient code.
@@ -101,7 +108,7 @@ mycountdf$patient <- gsub( "[[:graph:]]*_S","S" , mycountdf$patient)
 mycountdf$patient <- gsub( "_[[:graph:]]*","" , mycountdf$patient)
 mycountdf$patient <- as.factor(mycountdf$patient)
 
-mycountdf_splitted_by_patient <- split(mycountdf ,mycountdf$patient)
+mycountdf_splitted_by_patient <- split( mycountdf ,mycountdf$patient )
 
 list_counts_per_patient <- lapply( mycountdf_splitted_by_patient , function(x){ count(x, sseqid)} )
 
@@ -150,18 +157,40 @@ write.table( df_reference_per_patient, file =reference_per_patient_path , sep=";
 # Plotting
 sseqid_countmatrix_splitted <- split( sseqid_countmatrix , sseqid_countmatrix$samplenumber )
 
+# Ordering the plot object
+order(sseqid_countmatrix_splitted[[1]][,"n"],decreasing = TRUE)
+
+sortme <-function(x){
+  the_order <- order(x[,"n"] , decreasing=TRUE)
+  x_sorted <- x[the_order,]
+  return(x_sorted)
+  }
+
+sseqid_countmatrix_splitted_sorted <- lapply(sseqid_countmatrix_splitted , sortme)
+
 
 #matrix <- sseqid_countmatrix_splitted[[1]]
 
 
-  for ( k in 1:length(sseqid_countmatrix_splitted) ) {
+  for ( k in 1:length( sseqid_countmatrix_splitted_sorted ) ) {
   pdf( file = paste0( save_folder,"/", label,"_",k,".pdf") , width = 7 , height = 7  )
-  gg<-  ggplot( data= sseqid_countmatrix_splitted[[k]] , aes( x= sseqid, y= n))
-  ggjingles <- gg + geom_col(aes(fill="counts"))+
-    theme(axis.text.x = element_text(angle = 65, hjust = 1), text = element_text(size=9)) +
-    labs(x="Virus", y= "Count per Case") +
-    ggtitle(k)
+    gg <-  ggplot( data= sseqid_countmatrix_splitted_sorted[[k]] , aes( x= reorder( sseqid, -n_corrected_by_CF),n_corrected_by_CF ))
+    ggjingles <- gg + geom_col(aes(fill="n_corrected"))+
+      theme(axis.text.x = element_text(angle = 65, hjust = 1), text = element_text(size=9)) +
+      labs(x="Virus", y= "Counts corrected by libsize") +
+      ggtitle(k)
   print(ggjingles)
   dev.off()
-  
   }
+
+for ( k in 1:length( sseqid_countmatrix_splitted_sorted ) ) {
+  pdf( file = paste0( save_folder,"/", label,"_n_corrected_by_CF_",k,".pdf") , width = 7 , height = 7  )
+    gg <-  ggplot( data= sseqid_countmatrix_splitted_sorted[[k]] , aes( x= reorder( sseqid, -n_corrected_by_CF),n_corrected_by_CF ))
+    ggjingles <- gg + geom_col(aes(fill="n_corrected"))+
+      theme(axis.text.x = element_text(angle = 65, hjust = 1), text = element_text(size=9)) +
+      labs(x="Virus", y= "Counts corrected by libsize") +
+      ggtitle(k)
+  print(ggjingles)
+  dev.off()
+}
+

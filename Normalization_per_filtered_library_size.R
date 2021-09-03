@@ -158,8 +158,6 @@ write.table( df_reference_per_patient, file =reference_per_patient_path , sep=";
 sseqid_countmatrix_splitted <- split( sseqid_countmatrix , sseqid_countmatrix$samplenumber )
 
 # Ordering the plot object
-order(sseqid_countmatrix_splitted[[1]][,"n"],decreasing = TRUE)
-
 sortme <-function(x){
   the_order <- order(x[,"n"] , decreasing=TRUE)
   x_sorted <- x[the_order,]
@@ -193,4 +191,57 @@ for ( k in 1:length( sseqid_countmatrix_splitted_sorted ) ) {
   print(ggjingles)
   dev.off()
 }
+# 
+# listofdf_2_matrix <- function( sseqid_countmatrix, column_to_extract_counts ){ 
+#     
+#   
+#   }
+# 
+ Features_big_matrix <- unique(  as.character(  sseqid_countmatrix[,"sseqid"]  )  )
+ Samples_big_matrix <- unique( as.character ( sseqid_countmatrix[,"samplenumber"] ) )
 
+ BigMat <- matrix( # Building the matrix
+   rep( NA, length( Features_big_matrix) * length( Samples_big_matrix ) ) ,
+   nrow = length( Features_big_matrix)
+   )
+ rownames( BigMat) <- Features_big_matrix ; colnames( BigMat) <- Samples_big_matrix
+ BigMat_corrected_by_libsize<- BigMat
+ 
+ 
+ sseqid_countmatrix_splitted_sorted_sseqid_char <- lapply( sseqid_countmatrix_splitted_sorted , function(x){ x[,"sseqid"] <- as.character( x[,"sseqid"] ) ; return(x) } )
+ sseqid_countmatrix_splitted_sorted_sseqid_char <- lapply( sseqid_countmatrix_splitted_sorted , function(x){ rownames(x) <- x[,"sseqid"]  ; return(x) } )
+ 
+for( k in  names( sseqid_countmatrix_splitted_sorted_sseqid_char ) ) { 
+  for ( w in sseqid_countmatrix_splitted_sorted_sseqid_char[[k]][,"sseqid"] ) {
+    BigMat[ w, k] <- sseqid_countmatrix_splitted_sorted_sseqid_char[[k]][ w,"n"]
+  }
+}
+ 
+ BigMat_path <-paste0(save_folder,"/",label,"_BigMat_UnNormalized_counts.tsv")
+ write.table( BigMat , file = BigMat_path , sep="\t", col.names = TRUE, row.names = TRUE )
+ 
+ 
+ for( k in  names( sseqid_countmatrix_splitted_sorted_sseqid_char ) ) { 
+   for ( w in sseqid_countmatrix_splitted_sorted_sseqid_char[[k]][,"sseqid"] ) {
+     BigMat_corrected_by_libsize[ w, k] <- sseqid_countmatrix_splitted_sorted_sseqid_char[[k]][ w,"n_corrected_by_CF"]
+   }
+ }
+ BigMat_corrected_path <-paste0(save_folder,"/",label,"_BigMat_Corrected_by_library_size.tsv")
+ write.table( BigMat_corrected_by_libsize , file = BigMat_corrected_path , sep="\t", col.names = TRUE, row.names = TRUE )
+ 
+
+ BigMat_corrected_by_libsize[ is.na( BigMat_corrected_by_libsize) ] <- 0
+ 
+pdf( file = paste0( save_folder,"/", label,"_BigMat_corrected_by_libsize_Abundant_patient_per_contig.pdf") , width = 7 , height = 7  )
+heatmap(BigMat_corrected_by_libsize)   
+dev.off()
+
+pdf( file = paste0( save_folder,"/", label,"_BigMat_corrected_by_libsize_Abundant_ViralContigs_in_patients.pdf") , width = 7 , height = 7  )
+heatmap( t (BigMat_corrected_by_libsize)  )  
+dev.off()
+
+
+# S8, S10, S11, S15 : all immunocompetent native kidneys but BK counts: 24, >60, 24, >25 respectively  high bitscores (high sequence similarities, so “wrong” hits unlikely)
+# 12, S17, S18: native immunocompromised, BK count 26, >30, 24 could be undetected BK-Polyomanephropathy of native kidney
+# S1, S2, S14: transplant but SV40- (SV40 is the Immunohistochemistry-stain for Polyomavirus): BK counts >20, >25, >20 respectively
+# S3, S5, S7, S16 and S19: transplant, polyomavirus-positive controls
